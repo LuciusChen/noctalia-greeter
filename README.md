@@ -29,6 +29,10 @@ A minimal login greeter for [greetd](https://github.com/kennylevinsen/greetd) th
 
 Noctalia Greeter is the screen you see before your desktop session starts. It lets you pick a user, enter your password, choose a Wayland session, and pick a color scheme - with the same visual language as Noctalia. A configurable clock uses Noctalia-compatible time/date formats and the active greeter palette.
 
+Long session and color scheme menus fit within the screen and show a scrollbar.
+Use the mouse wheel, drag the scrollbar, or navigate with the arrow keys; see
+[keyboard and cursor controls](docs/user/input.md#keyboard-controls).
+
 It is built for **greetd**: greetd launches `noctalia-greeter-session`, which starts the bundled wlroots compositor and runs the greeter inside that session.
 
 Pair it with **[Noctalia v5](https://github.com/noctalia-dev/noctalia)** if you want wallpaper and palette synced from the shell settings (optional).

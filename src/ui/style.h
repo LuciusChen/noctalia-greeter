@@ -78,6 +78,13 @@ public:
   static constexpr float animNormal = 250.0f;
   static constexpr float animSlow = 400.0f;
 
+  // Scrollbars (matches noctalia).
+  static constexpr float scrollWheelStep = 56.0f;
+  static constexpr float scrollbarWidth = 6.0f;
+  static constexpr float scrollbarHoverWidth = 12.0f;
+  static constexpr float scrollbarGap = spaceSmBase;
+  static constexpr float scrollbarMinThumbHeight = 32.0f;
+
 private:
   static float s_uiScale;
   static float s_cornerRadiusScale;

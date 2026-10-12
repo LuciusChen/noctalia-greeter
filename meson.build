@@ -147,6 +147,7 @@ _greeter_sources = files(
   'src/ui/controls/glyph.cpp',
   'src/ui/controls/image.cpp',
   'src/ui/controls/scroll_view.cpp',
+  'src/ui/controls/scrollbar.cpp',
   'src/ui/controls/spacer.cpp',
   'src/ui/controls/spinner.cpp',
   'src/ui/controls/separator.cpp',

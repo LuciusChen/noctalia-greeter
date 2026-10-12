@@ -28,6 +28,7 @@
 #include "ui/controls/glyph.h"
 #include "ui/controls/input.h"
 #include "ui/controls/label.h"
+#include "ui/controls/scrollbar.h"
 #include "ui/controls/search_field.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -74,6 +75,7 @@ namespace {
   }
 
   constexpr std::size_t kUserDropdownMaxVisibleRows = 8;
+  constexpr std::size_t kSelectorMenuMaxVisibleRows = 8;
   const float kUserMenuPadding = Style::spaceSm();
   const float kUserMenuRowGap = Style::spaceXs();
   const float kUserMenuRowIconGap = Style::spaceSm();
@@ -888,15 +890,22 @@ void GreeterSurface::onPointerAxis(float x, float y, std::uint32_t axis, float a
   if (!pointerInViewport(x, y) || axisLines == 0.0f || axis != WL_POINTER_AXIS_VERTICAL_SCROLL) {
     return;
   }
-  if (!m_userMenuOpen || !pointerInUserMenuScrollArea(x, y)) {
-    return;
+  if (m_userMenuOpen && pointerInUserMenuScrollArea(x, y)) {
+    scrollUserMenu(static_cast<int>(std::round(axisLines)));
+  } else if (activeMenuScroll() != nullptr) {
+    const Box* panel = m_sessionMenuOpen ? m_sessionMenuPanel : m_schemeMenuPanel;
+    if (panel == nullptr
+        || x < panel->x()
+        || x > panel->x() + panel->width()
+        || y < panel->y()
+        || y > panel->y() + panel->height()) {
+      return;
+    }
+    m_menuScrollRemainder += axisLines;
+    const int delta = static_cast<int>(m_menuScrollRemainder);
+    m_menuScrollRemainder -= static_cast<float>(delta);
+    scrollSelectorMenu(delta);
   }
-
-  const int delta = static_cast<int>(std::round(axisLines));
-  if (delta == 0) {
-    return;
-  }
-  scrollUserMenu(delta);
 }
 
 void GreeterSurface::onKeyEvent(
@@ -2173,6 +2182,8 @@ void GreeterSurface::toggleSessionMenu() {
     clearSchemeMenu();
   }
   m_menuHighlight = -1;
+  m_sessionMenuScroll.offset = 0;
+  m_menuScrollRemainder = 0.0f;
   requestLayout();
 }
 
@@ -2191,6 +2202,8 @@ void GreeterSurface::toggleSchemeMenu() {
     clearSessionMenu();
   }
   m_menuHighlight = -1;
+  m_schemeMenuScroll.offset = 0;
+  m_menuScrollRemainder = 0.0f;
   requestLayout();
 }
 
@@ -2919,6 +2932,9 @@ void GreeterSurface::applyMenuHighlight() {
   }
 
   const std::ptrdiff_t count = static_cast<std::ptrdiff_t>(rows->size());
+  const std::size_t totalCount = m_userMenuOpen ? m_userMenuFilteredIndices.size()
+      : m_sessionMenuOpen                       ? m_sessions.size()
+                                                : m_schemeNames.size();
   if (m_userMenuOpen) {
     const std::size_t matchCount = m_userMenuFilteredIndices.size();
     if (matchCount == 0) {
@@ -2928,8 +2944,8 @@ void GreeterSurface::applyMenuHighlight() {
     if (m_menuHighlight < 0 || static_cast<std::size_t>(m_menuHighlight) >= matchCount) {
       m_menuHighlight = static_cast<std::ptrdiff_t>(std::min(selected, matchCount - 1));
     }
-  } else if (m_menuHighlight < 0 || m_menuHighlight >= count) {
-    m_menuHighlight = std::min(static_cast<std::ptrdiff_t>(selected), count - 1);
+  } else if (m_menuHighlight < 0 || static_cast<std::size_t>(m_menuHighlight) >= totalCount) {
+    m_menuHighlight = static_cast<std::ptrdiff_t>(std::min(selected, totalCount - 1));
   }
 
   for (std::ptrdiff_t i = 0; i < count; ++i) {
@@ -2939,12 +2955,15 @@ void GreeterSurface::applyMenuHighlight() {
       continue;
     }
 
-    const std::size_t filteredIndex = m_userMenuOpen ? m_userMenuScrollOffset + index : index;
-    const bool highlighted =
-        m_userMenuOpen ? filteredIndex == static_cast<std::size_t>(m_menuHighlight) : i == m_menuHighlight;
+    const MenuScroll* scroll = activeMenuScroll();
+    const std::size_t filteredIndex = (m_userMenuOpen          ? m_userMenuScrollOffset
+                                           : scroll != nullptr ? scroll->offset
+                                                               : 0)
+        + index;
+    const bool highlighted = filteredIndex == static_cast<std::size_t>(m_menuHighlight);
     const bool isSelected = m_userMenuOpen ? (filteredIndex < m_userMenuFilteredIndices.size()
                                               && m_userMenuFilteredIndices[filteredIndex] == m_selectedUser)
-                                           : (index == selected);
+                                           : (filteredIndex == selected);
     const float borderWidth = Style::borderWidth();
     const float panelRadius = Style::scaledRadiusLg();
     const float rowCorner = m_userMenuOpen ? Style::scaledRadiusSm() : panelRadius - borderWidth;
@@ -3025,15 +3044,27 @@ void GreeterSurface::moveMenuHighlight(int delta) {
     return;
   }
 
-  std::vector<Box*>* rows = m_sessionMenuOpen ? &m_sessionMenuRows : m_schemeMenuOpen ? &m_schemeMenuRows : nullptr;
-  if (rows == nullptr || rows->empty()) {
+  MenuScroll* scroll = activeMenuScroll();
+  if (scroll == nullptr || scroll->visibleCount == 0) {
     return;
   }
-  const std::ptrdiff_t count = static_cast<std::ptrdiff_t>(rows->size());
+  const std::ptrdiff_t count =
+      static_cast<std::ptrdiff_t>(m_sessionMenuOpen ? m_sessions.size() : m_schemeNames.size());
   if (m_menuHighlight < 0) {
     m_menuHighlight = 0;
   }
   m_menuHighlight = (((m_menuHighlight + delta) % count) + count) % count;
+  const std::size_t highlight = static_cast<std::size_t>(m_menuHighlight);
+  const std::size_t previousScroll = scroll->offset;
+  if (highlight < scroll->offset) {
+    scroll->offset = highlight;
+  } else if (highlight >= scroll->offset + scroll->visibleCount) {
+    scroll->offset = highlight + 1 - scroll->visibleCount;
+  }
+  if (scroll->offset != previousScroll) {
+    requestLayout();
+    return;
+  }
   applyMenuHighlight();
   requestRedraw();
 }
@@ -3083,6 +3114,33 @@ void GreeterSurface::scrollUserMenu(int delta) {
   if (m_userMenuScrollOffset != previousScroll) {
     refreshUserMenuRows();
   }
+}
+
+GreeterSurface::MenuScroll* GreeterSurface::activeMenuScroll() {
+  return m_sessionMenuOpen ? &m_sessionMenuScroll : m_schemeMenuOpen ? &m_schemeMenuScroll : nullptr;
+}
+
+void GreeterSurface::scrollSelectorMenu(int delta) {
+  MenuScroll* scroll = activeMenuScroll();
+  if (scroll == nullptr || scroll->visibleCount == 0 || delta == 0) {
+    return;
+  }
+  const std::size_t count = m_sessionMenuOpen ? m_sessions.size() : m_schemeNames.size();
+  const std::ptrdiff_t maxOffset = static_cast<std::ptrdiff_t>(count - scroll->visibleCount);
+  const std::size_t offset = static_cast<std::size_t>(
+      std::clamp(static_cast<std::ptrdiff_t>(scroll->offset) + delta, std::ptrdiff_t{0}, maxOffset)
+  );
+  if (offset != scroll->offset) {
+    scroll->offset = offset;
+    requestLayout();
+  }
+}
+
+void GreeterSurface::invalidateMenuPointers() {
+  // Rows are transient, but the shared Noctalia scrollbar stays alive through
+  // relayouts so its pointer capture and hover animation can continue.
+  const MenuScroll* scroll = activeMenuScroll();
+  m_inputDispatcher.invalidateTransientPointers(scroll != nullptr ? scroll->bar : nullptr);
 }
 
 bool GreeterSurface::pointerInUserMenuScrollArea(float x, float y) const {
@@ -3274,7 +3332,7 @@ void GreeterSurface::clearUserMenuRows() {
 }
 
 void GreeterSurface::clearUserMenu() {
-  m_inputDispatcher.invalidateTransientPointers();
+  invalidateMenuPointers();
   clearUserMenuRows();
   m_userMenuSearchQuery.clear();
   m_userMenuScrollOffset = 0;
@@ -3286,7 +3344,7 @@ void GreeterSurface::clearUserMenu() {
 }
 
 void GreeterSurface::clearSessionMenu() {
-  m_inputDispatcher.invalidateTransientPointers();
+  invalidateMenuPointers();
   if (m_sessionMenuPanel != nullptr) {
     (void)m_root.removeChild(m_sessionMenuPanel);
     m_sessionMenuPanel = nullptr;
@@ -3303,10 +3361,14 @@ void GreeterSurface::clearSessionMenu() {
   m_sessionMenuLabels.clear();
   m_sessionMenuAreas.clear();
   m_sessionMenuRows.clear();
+  if (!m_sessionMenuOpen && m_sessionMenuScroll.bar != nullptr) {
+    (void)m_root.removeChild(m_sessionMenuScroll.bar);
+    m_sessionMenuScroll = {};
+  }
 }
 
 void GreeterSurface::clearSchemeMenu() {
-  m_inputDispatcher.invalidateTransientPointers();
+  invalidateMenuPointers();
   if (m_schemeMenuPanel != nullptr) {
     (void)m_root.removeChild(m_schemeMenuPanel);
     m_schemeMenuPanel = nullptr;
@@ -3323,6 +3385,10 @@ void GreeterSurface::clearSchemeMenu() {
   m_schemeMenuLabels.clear();
   m_schemeMenuAreas.clear();
   m_schemeMenuRows.clear();
+  if (!m_schemeMenuOpen && m_schemeMenuScroll.bar != nullptr) {
+    (void)m_root.removeChild(m_schemeMenuScroll.bar);
+    m_schemeMenuScroll = {};
+  }
 }
 
 bool GreeterSurface::handleUserMenuSearchKey(std::uint32_t sym, bool preedit) {
@@ -3563,52 +3629,61 @@ void GreeterSurface::rebuildUserMenu() {
 void GreeterSurface::buildMenu(
     const std::vector<std::string>& names, std::size_t selected, Box* anchor, bool upward, bool rightAlign, int zBase,
     Box*& panelOut, std::vector<Box*>& rows, std::vector<Label*>& labels, std::vector<InputArea*>& areas,
-    std::function<void(std::size_t)> onSelect
+    MenuScroll& scroll, std::function<void(std::size_t)> onSelect
 ) {
   const std::size_t count = names.size();
   if (anchor == nullptr || count == 0) {
     return;
   }
-  (void)selected;
 
   const float rowH = Style::controlHeightSm();
-  const float anchorX = anchor->x();
-  const float anchorW = anchor->width();
-  const float h = rowH * static_cast<float>(count);
-
-  // Create and measure the labels first so the panel can be widened to fit the
-  // longest entry (session/scheme names are often wider than the selector).
-  float contentW = anchorW;
-  for (std::size_t i = 0; i < count; ++i) {
-    auto label = std::make_unique<Label>();
-    auto* labelPtr = label.get();
-    labelPtr->setText(names[i]);
-    labelPtr->setFontSize(Style::fontSizeBody());
-    labelPtr->setColor(colorForRole(ColorRole::OnSurface));
-    labelPtr->setZIndex(zBase + 2);
-    m_root.addChild(std::move(label));
-    labelPtr->measure(*m_renderContext);
-    contentW = std::max(contentW, labelPtr->width() + 2.0f * Style::spaceMd());
-    labels.push_back(labelPtr);
-  }
-
-  // Fit the content, but stay within the screen and never narrower than the
-  // selector.
-  const float screenW = m_root.width();
-  const float maxW = std::max(anchorW, screenW - 2.0f * Style::spaceLg());
-  const float w = std::min(contentW, maxW);
-  const float maxX = std::max(Style::spaceLg(), screenW - Style::spaceLg() - w);
-  float x = rightAlign ? (anchorX + anchorW - w) : anchorX;
-  x = std::clamp(x, Style::spaceLg(), maxX);
-
   const float borderWidth = Style::borderWidth();
-  const float panelH = h + 2.0f * borderWidth;
-  const float y =
-      upward ? (anchor->y() - panelH - Style::spaceXs()) : (anchor->y() + anchor->height() + Style::spaceXs());
+  const float margin = Style::spaceLg();
+  const float screenX = m_outputViewportActive ? m_viewportX : 0.0f;
+  const float screenY = m_outputViewportActive ? m_viewportY : 0.0f;
+  const float screenW = m_outputViewportActive ? m_viewportWidth : m_root.width();
+  const float screenH = m_outputViewportActive ? m_viewportHeight : m_root.height();
+  const float top = screenY + margin;
+  const float bottom = screenY + screenH - margin;
+  const float above = std::max(0.0f, anchor->y() - Style::spaceXs() - top);
+  const float below = std::max(0.0f, bottom - anchor->y() - anchor->height() - Style::spaceXs());
+  const float desiredH = rowH * static_cast<float>(std::min(count, kSelectorMenuMaxVisibleRows)) + 2.0f * borderWidth;
+  if (desiredH > (upward ? above : below) && (upward ? below : above) > (upward ? above : below)) {
+    upward = !upward;
+  }
+  const float availableH = upward ? above : below;
+  const std::size_t availableRows =
+      static_cast<std::size_t>(std::max(1.0f, std::floor((availableH - 2.0f * borderWidth) / rowH)));
+  scroll.visibleCount = std::min({count, kSelectorMenuMaxVisibleRows, availableRows});
+  const std::size_t maxOffset = count - scroll.visibleCount;
+  if (m_menuHighlight < 0) {
+    m_menuHighlight = static_cast<std::ptrdiff_t>(std::min(selected, count - 1));
+    const std::size_t highlight = static_cast<std::size_t>(m_menuHighlight);
+    scroll.offset = highlight >= scroll.visibleCount ? highlight + 1 - scroll.visibleCount : 0;
+  }
+  scroll.offset = std::min(scroll.offset, maxOffset);
+
+  const float gutter = maxOffset > 0 ? (Style::scrollbarWidth + Style::scrollbarGap) * Style::uiScale() : 0.0f;
+  float contentW = anchor->width();
+  for (const auto& name : names) {
+    const float textW = m_renderContext->measureText(name, Style::fontSizeBody()).width;
+    contentW = std::max(contentW, textW + 2.0f * Style::spaceMd() + gutter + 2.0f * borderWidth);
+  }
+  const float w = std::min(contentW, std::max(1.0f, screenW - 2.0f * margin));
+  const float minX = screenX + margin;
+  const float maxX = std::max(minX, screenX + screenW - margin - w);
+  const float x = std::clamp(rightAlign ? anchor->x() + anchor->width() - w : anchor->x(), minX, maxX);
+  const float listH = rowH * static_cast<float>(scroll.visibleCount);
+  const float panelH = listH + 2.0f * borderWidth;
+  const float y = std::clamp(
+      upward ? anchor->y() - panelH - Style::spaceXs() : anchor->y() + anchor->height() + Style::spaceXs(), top,
+      std::max(top, bottom - panelH)
+  );
 
   auto panel = std::make_unique<Box>();
   panelOut = panel.get();
   panelOut->setZIndex(zBase);
+  panelOut->setHitTestVisible(false);
   m_root.addChild(std::move(panel));
   panelOut->setPosition(x, y);
   panelOut->setSize(w, panelH);
@@ -3624,11 +3699,11 @@ void GreeterSurface::buildMenu(
   );
 
   const float panelRadius = Style::scaledRadiusLg();
-
-  for (std::size_t i = 0; i < count; ++i) {
+  for (std::size_t visibleIndex = 0; visibleIndex < scroll.visibleCount; ++visibleIndex) {
+    const std::size_t i = scroll.offset + visibleIndex;
     const float rowX = x + borderWidth;
-    const float rowY = y + borderWidth + rowH * static_cast<float>(i);
-    const float rowW = w - 2.0f * borderWidth;
+    const float rowY = y + borderWidth + rowH * static_cast<float>(visibleIndex);
+    const float rowW = w - 2.0f * borderWidth - gutter;
 
     auto row = std::make_unique<Box>();
     auto* rowPtr = row.get();
@@ -3637,14 +3712,13 @@ void GreeterSurface::buildMenu(
     rowPtr->setSize(rowW, rowH);
 
     Radii rowRadius(0.0f);
-    if (count == 1) {
+    if (scroll.visibleCount == 1) {
       rowRadius = Radii(panelRadius - borderWidth);
-    } else if (i == 0) {
+    } else if (visibleIndex == 0) {
       rowRadius = Radii(panelRadius - borderWidth, panelRadius - borderWidth, 0.0f, 0.0f);
-    } else if (i == count - 1) {
+    } else if (visibleIndex == scroll.visibleCount - 1) {
       rowRadius = Radii(0.0f, 0.0f, panelRadius - borderWidth, panelRadius - borderWidth);
     }
-
     rowPtr->setStyle(
         RoundedRectStyle{
             .fill = colorForRole(ColorRole::SurfaceVariant),
@@ -3655,8 +3729,18 @@ void GreeterSurface::buildMenu(
     m_root.addChild(std::move(row));
     rows.push_back(rowPtr);
 
-    Label* labelPtr = labels[i];
+    auto label = std::make_unique<Label>();
+    auto* labelPtr = label.get();
+    labelPtr->setText(names[i]);
+    labelPtr->setFontSize(Style::fontSizeBody());
+    labelPtr->setColor(colorForRole(ColorRole::OnSurface));
+    labelPtr->setMaxLines(1);
+    labelPtr->setMaxWidth(std::max(1.0f, rowW - 2.0f * Style::spaceMd()));
+    labelPtr->setZIndex(zBase + 2);
+    m_root.addChild(std::move(label));
+    labelPtr->measure(*m_renderContext);
     labelPtr->setPosition(rowX + Style::spaceMd(), rowY + std::round((rowH - labelPtr->height()) * 0.5f));
+    labels.push_back(labelPtr);
 
     auto area = std::make_unique<InputArea>();
     auto* areaPtr = area.get();
@@ -3668,15 +3752,35 @@ void GreeterSurface::buildMenu(
       requestRedraw();
     });
     areaPtr->setOnClick([onSelect, i](const InputArea::PointerData& data) {
-      if (data.button != BTN_LEFT) {
-        return;
+      if (data.button == BTN_LEFT) {
+        onSelect(i);
       }
-      onSelect(i);
     });
     m_root.addChild(std::move(area));
     areaPtr->setPosition(rowX, rowY);
     areaPtr->setSize(rowW, rowH);
     areas.push_back(areaPtr);
+  }
+
+  if (maxOffset > 0 && scroll.bar == nullptr) {
+    auto bar = std::make_unique<Scrollbar>();
+    scroll.bar = bar.get();
+    scroll.bar->setZIndex(zBase + 4);
+    m_root.addChild(std::move(bar));
+  }
+  if (scroll.bar != nullptr) {
+    scroll.bar->setContentScale(Style::uiScale());
+    scroll.bar->setTrackInset(std::min(panelRadius, listH * 0.25f));
+    scroll.bar->setPosition(x + w - borderWidth - Style::scrollbarWidth * Style::uiScale(), y + borderWidth);
+    scroll.bar->setSize(Style::scrollbarWidth * Style::uiScale(), listH);
+    scroll.bar->setOnScrollChanged([this, &scroll, rowH, maxOffset](float offset) {
+      const std::size_t rowOffset = std::min(maxOffset, static_cast<std::size_t>(std::round(offset / rowH)));
+      if (rowOffset != scroll.offset) {
+        scroll.offset = rowOffset;
+        requestLayout();
+      }
+    });
+    scroll.bar->update(listH, rowH * static_cast<float>(count), rowH * static_cast<float>(scroll.offset));
   }
 }
 
@@ -3693,7 +3797,7 @@ void GreeterSurface::rebuildSessionMenu() {
   buildMenu(
       names, m_selectedSession, m_sessionSelectBox, /*upward=*/false,
       /*rightAlign=*/false, /*zBase=*/50, m_sessionMenuPanel, m_sessionMenuRows, m_sessionMenuLabels,
-      m_sessionMenuAreas, [this](std::size_t i) { selectSession(i); }
+      m_sessionMenuAreas, m_sessionMenuScroll, [this](std::size_t i) { selectSession(i); }
   );
 }
 
@@ -3708,6 +3812,6 @@ void GreeterSurface::rebuildSchemeMenu() {
       m_schemeNames, m_selectedScheme, m_schemeSelectBox,
       /*upward=*/upward,
       /*rightAlign=*/true, /*zBase=*/60, m_schemeMenuPanel, m_schemeMenuRows, m_schemeMenuLabels, m_schemeMenuAreas,
-      [this](std::size_t i) { selectScheme(i); }
+      m_schemeMenuScroll, [this](std::size_t i) { selectScheme(i); }
   );
 }

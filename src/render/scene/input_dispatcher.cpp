@@ -168,17 +168,28 @@ void InputDispatcher::setCursorShapeCallback(std::function<void(std::uint32_t, s
   m_cursorShapeCallback = std::move(callback);
 }
 
-void InputDispatcher::invalidateTransientPointers() {
-  if (m_hoveredArea != nullptr) {
+void InputDispatcher::invalidateTransientPointers(const Node* preservedSubtree) {
+  const auto preserved = [preservedSubtree](const Node* node) {
+    if (preservedSubtree == nullptr) {
+      return false;
+    }
+    for (; node != nullptr; node = node->parent()) {
+      if (node == preservedSubtree) {
+        return true;
+      }
+    }
+    return false;
+  };
+  if (m_hoveredArea != nullptr && !preserved(m_hoveredArea)) {
     m_hoveredArea->m_hovered = false;
     m_hoveredArea->m_pressed = false;
     if (m_hoveredArea->m_onLeave) {
       m_hoveredArea->m_onLeave();
     }
+    m_hoveredArea = nullptr;
   }
-  if (m_capturedArea != nullptr) {
+  if (m_capturedArea != nullptr && !preserved(m_capturedArea)) {
     m_capturedArea->m_pressed = false;
+    m_capturedArea = nullptr;
   }
-  m_hoveredArea = nullptr;
-  m_capturedArea = nullptr;
 }

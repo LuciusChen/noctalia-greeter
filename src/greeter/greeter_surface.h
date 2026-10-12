@@ -29,6 +29,7 @@ class Glyph;
 class GreeterWindow;
 class Input;
 class SearchField;
+class Scrollbar;
 class InputArea;
 class Label;
 class RenderContext;
@@ -142,11 +143,19 @@ private:
   void ensureUserMenuHighlightVisible();
   void scrollUserMenu(int delta);
   [[nodiscard]] bool pointerInUserMenuScrollArea(float x, float y) const;
+  struct MenuScroll {
+    std::size_t offset = 0;
+    std::size_t visibleCount = 0;
+    Scrollbar* bar = nullptr;
+  };
+  [[nodiscard]] MenuScroll* activeMenuScroll();
+  void scrollSelectorMenu(int delta);
+  void invalidateMenuPointers();
   void applyMenuHighlight();
   void buildMenu(
       const std::vector<std::string>& names, std::size_t selected, Box* anchor, bool upward, bool rightAlign, int zBase,
       Box*& panelOut, std::vector<Box*>& rows, std::vector<Label*>& labels, std::vector<InputArea*>& areas,
-      std::function<void(std::size_t)> onSelect
+      MenuScroll& scroll, std::function<void(std::size_t)> onSelect
   );
   void rebuildUserMenu();
   void refreshUserMenuRows();
@@ -316,6 +325,9 @@ private:
   std::size_t m_userMenuScrollOffset = 0;
   bool m_userMenuSearchFocusPending = false;
   Box* m_sessionMenuPanel = nullptr;
+  MenuScroll m_sessionMenuScroll;
+  MenuScroll m_schemeMenuScroll;
+  float m_menuScrollRemainder = 0.0f;
   std::vector<Label*> m_userMenuLabels;
   std::vector<InputArea*> m_userMenuAreas;
   std::vector<Box*> m_userMenuRows;

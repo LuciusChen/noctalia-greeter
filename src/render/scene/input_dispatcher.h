@@ -22,7 +22,7 @@ public:
 
   void setFocus(InputArea* area);
   void setCursorShapeCallback(std::function<void(std::uint32_t serial, std::uint32_t shape)> callback);
-  void invalidateTransientPointers();
+  void invalidateTransientPointers(const Node* preservedSubtree = nullptr);
 
 private:
   Node* m_sceneRoot = nullptr;
