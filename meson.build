@@ -63,6 +63,8 @@ if not cc.has_header('stb/stb_image_resize2.h')
 endif
 
 libwebp_dep = dependency('libwebp', required: true)
+libjxl_dep = dependency('libjxl', required: true)
+libjxl_threads_dep = dependency('libjxl_threads', required: true)
 
 # ── Wayland protocol generation ───────────────────────────────────────────────
 wayland_scanner    = find_program('wayland-scanner')
@@ -200,6 +202,8 @@ noctalia_greeter_executable = executable('noctalia-greeter',
     gobject_dep,
     gio_dep,
     libwebp_dep,
+    libjxl_dep,
+    libjxl_threads_dep,
     nlohmann_dep,
     tomlplusplus_dep,
   ],
@@ -364,6 +368,20 @@ legacy_staging_compatibility_test = executable(
 )
 
 test('legacy-staging-compatibility', legacy_staging_compatibility_test)
+
+jxl_decoder_test = executable(
+  'jxl-decoder-test',
+  sources: files(
+    'tests/jxl_decoder_test.cpp',
+    'src/render/core/image_decoder.cpp',
+  ),
+  dependencies: [libwebp_dep, libjxl_dep, libjxl_threads_dep],
+  include_directories: _greeter_inc,
+  cpp_args: ['-Wall', '-Wextra', '-Wpedantic', '-Wconversion', '-Wshadow'],
+  build_by_default: false,
+)
+
+test('jxl-decoder', jxl_decoder_test)
 
 wallpaper_span_geometry_test = executable(
   'wallpaper-span-geometry-test',

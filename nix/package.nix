@@ -18,6 +18,7 @@
   harfbuzz,
   libxkbcommon,
   libwebp,
+  libjxl,
   glib,
   librsvg,
   libxml2,
@@ -81,6 +82,7 @@ in
       harfbuzz
       libxkbcommon
       libwebp
+      libjxl
       glib
       librsvg
       libxml2

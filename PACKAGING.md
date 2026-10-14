@@ -90,7 +90,9 @@ Notes packagers hit often:
   only packages are not enough).
 - **libxml2** headers and pkg-config metadata are required to build the
   installed-policy validator used by `passwordless-sync enable`.
-- **libwebp** is required by the current Meson build for wallpaper decoding.
+- **libwebp** is required by the current Meson build for WebP wallpaper decoding.
+- **libjxl** is required for JPEG XL wallpaper decoding. It must provide both
+  the `libjxl` and `libjxl_threads` pkg-config modules.
 
 ### Vendored (no system package)
 
@@ -124,6 +126,7 @@ preserve it when packaging the required `assets/` tree.
 | Cairo, Pango, Fontconfig, FreeType, HarfBuzz, librsvg, GLib | Text and UI rendering |
 | libxml2 | Validate the installed Polkit action before enabling passwordless sync |
 | libwebp | WebP wallpaper decoding |
+| libjxl | JPEG XL wallpaper decoding |
 
 Optional:
 

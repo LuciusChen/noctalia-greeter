@@ -59,6 +59,7 @@ on_hover = "#0e0e43"
 [appearance.wallpaper]
 # Applied independently of scheme/palette selection.
 # Absolute path, or color:#RRGGBB.
+# JPEG XL (.jxl) wallpapers are supported.
 # fill_mode: center | crop | fit | stretch | repeat | span
 # span projects one image across the logical multi-monitor layout; with one pinned output it behaves like crop.
 path = "/var/lib/noctalia-greeter/wallpaper.webp"

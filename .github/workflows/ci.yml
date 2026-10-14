@@ -45,7 +45,7 @@ jobs:
             cairo pango harfbuzz \
             librsvg libxkbcommon glib2 \
             tomlplusplus nlohmann-json stb \
-            libwebp jemalloc
+            libwebp libjxl jemalloc
 
       - uses: actions/checkout@v4
 
@@ -54,3 +54,6 @@ jobs:
 
       - name: Build
         run: meson compile -C build-debug
+
+      - name: Test JPEG XL decoder
+        run: meson test -C build-debug jxl-decoder --print-errorlogs
