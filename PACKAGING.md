@@ -17,7 +17,7 @@ AppStream, etc.):
 | Name | `noctalia-greeter` |
 | Homepage | https://github.com/noctalia-dev/noctalia-greeter |
 | Docs | https://docs.noctalia.dev |
-| License | MIT ([LICENSE](LICENSE)) |
+| License | Project: MIT ([LICENSE](LICENSE)); with bundled Wuffs: `MIT AND (Apache-2.0 OR MIT)` |
 | Version | Meson `project(... version: ...)` in [`meson.build`](meson.build) |
 | Session wrapper | `noctalia-greeter-session` (what greetd should run) |
 
@@ -28,6 +28,16 @@ AppStream, etc.):
 - Recommended for packages: `meson setup build --buildtype=plain` (or `release` **without** relying on `-march=native`; the default `release` buildtype in `meson.build` enables CPU-local flags that are not portable across machines).
 - **wlroots 0.20** and **wayland-server** are required (the compositor is not optional).
 
+Run the upstream test suite as part of the package build:
+
+```sh
+meson test -C build --print-errorlogs
+```
+
+Build environments need Meson, Ninja, a C/C++ compiler, and pkg-config.
+Building from a Git checkout also requires Git. Map these requirements to
+the target distribution's package names and build dependency conventions.
+
 Install with the prefix you intend to ship. Greetd `command` must point at the installed `noctalia-greeter-session` path (often `/usr/bin/...`, not `/usr/local/bin/...`).
 
 ### Installed layout
@@ -36,6 +46,7 @@ Install with the prefix you intend to ship. Greetd `command` must point at the i
 <prefix>/bin/noctalia-greeter
 <prefix>/bin/noctalia-greeter-compositor
 <prefix>/bin/noctalia-greeter-session
+<prefix>/bin/noctalia-greeter-xsession
 <prefix>/bin/noctalia-greeter-apply-appearance
 <prefix>/bin/noctalia-greeter-print-greetd-config   # optional helper
 <prefix>/share/noctalia-greeter/assets/...
@@ -66,27 +77,34 @@ EGL/GLES pkg-config modules are missing).
 ### Build-time (required)
 
 Canonical list is the `dependency(...)` / header checks in
-[`meson.build`](meson.build). The [README](README.md) has copy-paste install
-lines for common distros (Arch, Fedora, openSUSE, Debian, Void).
+[`meson.build`](meson.build). The [source-build guide](docs/user/building-from-source.md)
+has dependency installation commands for several distributions.
 
 Notes packagers hit often:
 
 - **wlroots 0.20** (`wlroots-0.20` pkg-config) and **wayland-server** are
   required. The compositor is not optional.
+- **libinput** is a direct compositor dependency and needs headers and
+  pkg-config metadata at build time, plus the library at runtime.
 - **stb** must provide `stb/stb_image_resize2.h` (older `stb_image_resize`
   only packages are not enough).
 - **libxml2** headers and pkg-config metadata are required to build the
   installed-policy validator used by `passwordless-sync enable`.
-
-Optional at build time (only if you ship the matching feature):
-
-- **libwebp** for WebP wallpapers when appearance is synced from Noctalia Shell
-  (other raster formats use vendored Wuffs).
+- **libwebp** is required by the current Meson build for wallpaper decoding.
 
 ### Vendored (no system package)
 
-Shipped under `third_party/`: **Wuffs** (image decode). License file lives beside
-the sources.
+Shipped under `third_party/`: **Wuffs** (image decode), under
+`Apache-2.0 OR MIT`. The vendored `third_party/wuffs/wuffs-v0.4.c` contains its
+copyright and SPDX notice, but the separate license texts are not included in
+this source tree.
+
+Packages should install Wuffs' applicable license texts and preserve its
+copyright notice alongside the project's [LICENSE](LICENSE). Obtain the
+license texts from the Wuffs revision recorded in the vendored file and
+preserve that file's copyright notice.
+The installed Tabler assets also include `fonts/tabler-icons-license.txt`;
+preserve it when packaging the required `assets/` tree.
 
 ### Runtime
 
@@ -94,21 +112,24 @@ the sources.
 |---|---|
 | **greetd** | Display manager; greeter runs as greetd's `default_session` |
 | **D-Bus** | `noctalia-greeter-session` wraps the compositor in `dbus-run-session` |
+| Bash | Installed setup scripts |
+| C++ runtime libraries | Greeter and helper binaries |
 | PAM (`/etc/pam.d/greetd`) | Authentication |
 | Wayland sessions | `.desktop` files under `wayland-sessions` (niri, Hyprland, etc.) |
 | X11 sessions (optional) | `.desktop` files under `xsessions`, run through `noctalia-greeter-xsession` |
 | `xinit` (optional) | Provides `startx`, required at runtime for `xsessions` entries to actually start (not needed for wayland-sessions) |
 | wlroots 0.20 | `noctalia-greeter-compositor` (KMS, libinput, xkbcommon, wayland-server) |
+| libinput | Direct input handling in the compositor |
 | Mesa / EGL / GLES | Greeter client rendering (or epoxy where distros split packages that way) |
 | Cairo, Pango, Fontconfig, FreeType, HarfBuzz, librsvg, GLib | Text and UI rendering |
 | libxml2 | Validate the installed Polkit action before enabling passwordless sync |
+| libwebp | WebP wallpaper decoding |
 
 Optional:
 
 | Dependency | Role |
 |---|---|
 | **Polkit daemon and `pkexec`** | Authorize `noctalia-greeter-apply-appearance --sync`; some distributions package `pkexec` separately |
-| **libwebp** | WebP wallpaper decode for that sync path (Wuffs covers other raster formats) |
 
 Optional pairing with **[Noctalia v5](https://github.com/noctalia-dev/noctalia)**
 for wallpaper/palette sync from shell settings. The constrained sync protocol
@@ -135,7 +156,16 @@ Use the real path from your package prefix. Optional pinned session:
 command = "/usr/bin/noctalia-greeter-session -- --session niri"
 ```
 
-`setup_greeter_system.sh` (installed under `share/noctalia-greeter/`) prints a ready-to-paste block and patches greetd PAM for `XDG_RUNTIME_DIR`. Packagers may wrap or invoke it from `postinst`.
+`setup_greeter_system.sh` (installed under `share/noctalia-greeter/`) prepares
+state, prints a ready-to-paste block, and directly patches greetd PAM for a
+systemd/elogind runtime module. Use it only when that PAM change is appropriate
+for the target distribution. A package that needs only state initialization
+can invoke `noctalia-greeter-apply-appearance --setup-system` instead.
+
+Integrate greetd configuration, PAM, and service management according to the
+target distribution's conventions. Reuse its existing PAM stack when it
+already supplies the required session setup. Document any manual state
+initialization steps in the [installation guide](docs/user/installation.md#initialize-greeter-state).
 
 Do **not** put environment assignments inside greetd TOML (`FOO=1 /path/...` is invalid). Use a plain path, or `env FOO=1 /path/...` in `command` if needed.
 
@@ -163,23 +193,27 @@ small hand parser, not full TOML.
 
 ### What packagers should do
 
-**After install (recommended):** create the state dir and `chown` it to the same
-user greetd runs the greeter as. Once that is done, step 2 wins and tools do not
-need to read greetd config at all. This covers distros where greetd's live
-config is not `/etc/greetd/config.toml`.
+Create the state dir with mode `0750` and ownership matching the account
+greetd uses for the greeter session. Use the distribution's tmpfiles hook or
+an appropriate installation script. Once ownership is correct, step 2 wins
+and tools do not need to read greetd config at all. This covers distros where
+greetd's live config is not `/etc/greetd/config.toml`.
 
 ```sh
 # Example postinst fragment (adjust user and paths)
 greeter_user=greeter
+greeter_group=$(id -gn "${greeter_user}")
 state_dir=/var/lib/noctalia-greeter
-install -d -m 0750 -o "${greeter_user}" -g "${greeter_user}" "${state_dir}"
+install -d -m 0750 -o "${greeter_user}" -g "${greeter_group}" "${state_dir}"
 ```
 
-Or run the shipped setup script as root (it resolves the user, prepares paths,
-and installs default `greeter.toml`):
+To initialize `greeter.toml` and `sync.toml` or migrate legacy state, use the
+installed helper as root. Pass the intended account explicitly when changing
+users, because an existing state-directory owner takes precedence over greetd
+configuration:
 
 ```sh
-/usr/share/noctalia-greeter/setup_greeter_system.sh
+GREETER_USER=greeter /usr/bin/noctalia-greeter-apply-appearance --setup-system
 ```
 
 **First install / greenfield:** ownership cannot work until the directory exists
@@ -189,20 +223,31 @@ that is fragile and still misses custom layouts.
 
 | Situation | Approach |
 |---|---|
-| Normal packaged install | `chown` state dir in `postinst` to session user |
+| Normal packaged install | Use distro tmpfiles hooks or create state with the correct owner in an installation script |
 | Nonstandard greetd config location | Set `GREETER_USER` for setup/sync tools, or `GREETD_CONFIG` if the file path is known |
-| Manual setup on a new machine | Run `setup_greeter_system.sh` (reads standard greetd config paths) |
+| Manual state initialization | Run `noctalia-greeter-apply-appearance --setup-system` after configuring the account and ownership |
 | NixOS | [`nix/nixos-module.nix`](nix/nixos-module.nix) wires user, tmpfiles, and greetd `command` |
 
 ### tmpfiles.d
 
-Meson installs `lib/tmpfiles.d/noctalia-greeter.conf`, which recreates
-`/var/lib/noctalia-greeter` as `greeter:greeter`. That drop-in is optional
-convenience for systemd/opentmpfiles; it **hardcodes** the `greeter` user.
+Meson installs `lib/tmpfiles.d/noctalia-greeter.conf`, which creates
+`/var/lib/noctalia-greeter` with mode `0750` as `greeter:greeter`. Distributions
+with tmpfiles integration can apply it during installation and at boot.
+It **hardcodes** the `greeter` user and does not initialize configuration files.
 
-If your package uses a different session user, either override under
-`/etc/tmpfiles.d/` or rely on `postinst` + `ensure_greeter_paths` from
-`setup_greeter_system.sh` (portable across OpenRC, runit, systemd, etc.).
+If your package uses a different session user, adapt or omit the packaged
+rule. Administrators can override it with
+`/etc/tmpfiles.d/noctalia-greeter.conf`:
+
+```text
+d /var/lib/noctalia-greeter 0750 ACCOUNT GROUP -
+```
+
+Use the actual account and primary group, then run
+`systemd-tmpfiles --create noctalia-greeter.conf`. A one-time `chown` or helper
+invocation alone does not fix an incompatible rule: it would reset ownership
+at the next boot. On systems without tmpfiles processing, the state helper or
+an installation script must create the directory instead.
 
 ## System paths
 
@@ -210,7 +255,7 @@ If your package uses a different session user, either override under
 |---|---|---|
 | `/var/lib/noctalia-greeter/` | greetd session user (`0750`) | `greeter.toml`, `sync.toml`, wallpapers, synced layout |
 | `/etc/greetd/config.toml` | root (readable by greeter user) | greetd session definition (bootstrap only for user resolution) |
-| `/etc/pam.d/greetd` | root | PAM stack; setup script adds elogind/systemd runtime dir module |
+| `/etc/pam.d/greetd` | root | Distribution-managed PAM stack; full setup script can add an elogind/systemd runtime module |
 
 Override the runtime/setup state dir with `NOCTALIA_GREETER_STATE_DIR` (it must
 match across greetd, setup scripts, and legacy helper modes). The constrained

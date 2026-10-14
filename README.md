@@ -68,3 +68,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor guidance.
 ## License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+
+Bundled Wuffs code is available under Apache-2.0 or MIT. See
+[packaging notes](PACKAGING.md#vendored-no-system-package) for its license notices.
