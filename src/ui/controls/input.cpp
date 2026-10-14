@@ -776,6 +776,10 @@ std::string Input::utf32ToUtf8(std::uint32_t cp) {
 }
 
 std::size_t Input::previousWordStartForByteOffset(std::size_t offset) const {
+  // A masked password is a single word: boundaries would reveal where its spaces are.
+  if (m_passwordMode) {
+    return 0;
+  }
   if (m_value.empty()) {
     return 0;
   }
@@ -799,6 +803,9 @@ std::size_t Input::previousWordStartForByteOffset(std::size_t offset) const {
 }
 
 std::size_t Input::nextWordStartForByteOffset(std::size_t offset) const {
+  if (m_passwordMode) {
+    return m_value.size();
+  }
   if (m_value.empty()) {
     return 0;
   }
@@ -816,6 +823,9 @@ std::size_t Input::nextWordStartForByteOffset(std::size_t offset) const {
 }
 
 std::size_t Input::nextWordEndForByteOffset(std::size_t offset) const {
+  if (m_passwordMode) {
+    return m_value.size();
+  }
   if (m_value.empty()) {
     return 0;
   }
