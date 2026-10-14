@@ -1,4 +1,4 @@
---
+---
 title: Installation
 description: Install Noctalia Greeter from distribution packages, NixOS, or source and connect it to greetd.
 sidebar:
