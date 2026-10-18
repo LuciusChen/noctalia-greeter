@@ -160,6 +160,7 @@ _greeter_sources = files(
   'src/greetd/greetd_client.cpp',
   'src/greeter/appearance_sync.cpp',
   'src/greeter/appearance_config.cpp',
+  'src/greeter/frame_demand.cpp',
   'src/greeter/session_config.cpp',
   'src/greeter/greetd_user.cpp',
   'src/greeter/privileged_state_paths.cpp',
@@ -461,6 +462,20 @@ time_format_test = executable(
 )
 
 test('time-format', time_format_test)
+
+frame_demand_test = executable(
+  'frame-demand-test',
+  sources: files(
+    'tests/frame_demand_test.cpp',
+    'src/greeter/frame_demand.cpp',
+    'src/render/animation/animation_manager.cpp',
+  ),
+  include_directories: include_directories('src'),
+  cpp_args: ['-Wall', '-Wextra', '-Wpedantic', '-Wconversion', '-Wshadow'],
+  build_by_default: false,
+)
+
+test('frame-demand', frame_demand_test)
 
 wallpaper_program_pixel_test = executable(
   'wallpaper-program-pixel-test',
