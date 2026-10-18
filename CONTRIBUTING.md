@@ -88,6 +88,11 @@ Choose verification that exercises the behavior being changed:
 - NixOS module changes: build the flake or module and test the generated greeter configuration.
 - Logging changes: use `just log-test` and confirm the expected stderr or log-file behavior.
 
+Run `meson test -C build greeter-frame-loop --print-errorlogs` for frame scheduling changes. It runs the real greeter
+window and EGL renderer under the bundled compositor's headless backend, checks callback registration before buffer
+swaps, and exercises animation, idle, redraw, layout, and restart behavior. It needs Mesa software rendering; no running
+Wayland session or greetd setup is required.
+
 A compositor session can affect the user's display. Before testing an installed greetd setup or any command that may
 interrupt a live session, make the test environment explicit and keep a recovery terminal available. `just recover`
 terminates the greeter processes and prints the next recovery step when a display is stuck.

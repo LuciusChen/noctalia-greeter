@@ -160,7 +160,6 @@ _greeter_sources = files(
   'src/greetd/greetd_client.cpp',
   'src/greeter/appearance_sync.cpp',
   'src/greeter/appearance_config.cpp',
-  'src/greeter/frame_demand.cpp',
   'src/greeter/session_config.cpp',
   'src/greeter/greetd_user.cpp',
   'src/greeter/privileged_state_paths.cpp',
@@ -174,7 +173,6 @@ _greeter_sources = files(
   'src/greeter/greeter.cpp',
   'src/tools/passwordless_sync_policy.cpp',
   'src/tools/passwordless_sync_policy_xml.cpp',
-  'src/main.cpp',
 ) + _protocol_sources
 
 _greeter_inc = [
@@ -182,32 +180,34 @@ _greeter_inc = [
   include_directories('third_party/wuffs', is_system: true),
 ]
 
+_greeter_dependencies = [
+  wayland_client_dep,
+  egl_dep,
+  gles2_dep,
+  wayland_egl_dep,
+  xkbcommon_dep,
+  freetype2_dep,
+  fontconfig_dep,
+  cairo_dep,
+  cairo_ft_dep,
+  pango_dep,
+  pangocairo_dep,
+  pangoft2_dep,
+  librsvg_dep,
+  libxml2_dep,
+  glib_dep,
+  gobject_dep,
+  gio_dep,
+  libwebp_dep,
+  libjxl_dep,
+  libjxl_threads_dep,
+  nlohmann_dep,
+  tomlplusplus_dep,
+]
+
 noctalia_greeter_executable = executable('noctalia-greeter',
-  sources: _greeter_sources,
-  dependencies: [
-    wayland_client_dep,
-    egl_dep,
-    gles2_dep,
-    wayland_egl_dep,
-    xkbcommon_dep,
-    freetype2_dep,
-    fontconfig_dep,
-    cairo_dep,
-    cairo_ft_dep,
-    pango_dep,
-    pangocairo_dep,
-    pangoft2_dep,
-    librsvg_dep,
-    libxml2_dep,
-    glib_dep,
-    gobject_dep,
-    gio_dep,
-    libwebp_dep,
-    libjxl_dep,
-    libjxl_threads_dep,
-    nlohmann_dep,
-    tomlplusplus_dep,
-  ],
+  sources: _greeter_sources + files('src/main.cpp'),
+  dependencies: _greeter_dependencies,
   include_directories: _greeter_inc,
   cpp_args: [
     '-Wall', '-Wextra', '-Wpedantic', '-Wconversion', '-Wshadow',
@@ -463,19 +463,29 @@ time_format_test = executable(
 
 test('time-format', time_format_test)
 
-frame_demand_test = executable(
-  'frame-demand-test',
-  sources: files(
-    'tests/frame_demand_test.cpp',
-    'src/greeter/frame_demand.cpp',
-    'src/render/animation/animation_manager.cpp',
-  ),
-  include_directories: include_directories('src'),
+greeter_frame_loop_test = executable(
+  'greeter-frame-loop-test',
+  sources: files('tests/greeter_frame_loop_test.cpp'),
+  # Exercise the production window, rendering, and animation code without
+  # recompiling it or linking the greeter's main().
+  objects: noctalia_greeter_executable.extract_objects(_greeter_sources),
+  dependencies: _greeter_dependencies,
+  include_directories: _greeter_inc,
   cpp_args: ['-Wall', '-Wextra', '-Wpedantic', '-Wconversion', '-Wshadow'],
+  link_args: ['-Wl,--wrap=wl_proxy_add_listener', '-Wl,--wrap=eglSwapBuffers'],
   build_by_default: false,
 )
 
-test('frame-demand', frame_demand_test)
+test(
+  'greeter-frame-loop',
+  find_program('sh'),
+  args: [
+    meson.project_source_root() / 'tests/greeter_frame_loop_test.sh',
+    noctalia_greeter_compositor_executable,
+    greeter_frame_loop_test,
+  ],
+  timeout: 30,
+)
 
 wallpaper_program_pixel_test = executable(
   'wallpaper-program-pixel-test',

@@ -2,7 +2,6 @@
 
 #include "core/log.h"
 #include "fractional-scale-v1-client-protocol.h"
-#include "greeter/frame_demand.h"
 #include "greeter/greeter_surface.h"
 #include "render/gl_shared_context.h"
 #include "render/render_context.h"
@@ -256,7 +255,7 @@ void GreeterWindow::paintFrame() {
   }
 
   const bool needsLayout = m_layoutNeeded || m_greeterSurface.sceneRoot()->layoutDirty();
-  if (!frameNeedsRedraw(frameDemand())) {
+  if (!needsRedraw()) {
     return;
   }
 
@@ -276,14 +275,12 @@ void GreeterWindow::paintFrame() {
   }
 }
 
-FrameDemand GreeterWindow::frameDemand() {
-  return FrameDemand{
-      .redrawRequested = m_redrawNeeded,
-      .layoutRequested = m_layoutNeeded,
-      .sceneLayoutDirty = m_greeterSurface.sceneRoot()->layoutDirty(),
-      .scenePaintDirty = m_greeterSurface.sceneRoot()->paintDirty(),
-      .animating = m_greeterSurface.animating(),
-  };
+bool GreeterWindow::needsRedraw() const noexcept {
+  return m_redrawNeeded
+      || m_layoutNeeded
+      || m_greeterSurface.sceneRoot()->layoutDirty()
+      || m_greeterSurface.sceneRoot()->paintDirty()
+      || m_greeterSurface.animating();
 }
 
 void GreeterWindow::requestNextFrame() {
@@ -311,7 +308,7 @@ void GreeterWindow::handleFrameDone(void* data, wl_callback* callback, std::uint
     return;
   }
 
-  const bool dirty = frameNeedsRedraw(self->frameDemand());
+  const bool dirty = self->needsRedraw();
   // Request the next callback before committing, so it is attached to this frame and keeps animations running.
   self->requestNextFrame();
   if (dirty) {
