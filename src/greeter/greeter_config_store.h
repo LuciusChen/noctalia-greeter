@@ -83,6 +83,8 @@ namespace greeter::config {
     std::optional<std::string> clockPosition;
     std::optional<std::string> clockTimeFormat;
     std::optional<std::string> clockDateFormat;
+    std::optional<float> clockTimeFontSize;
+    std::optional<float> clockDateFontSize;
   };
 
   // Sync + UI mutable file (sync.toml). Never managed by Nix. Loses to greeter.toml.

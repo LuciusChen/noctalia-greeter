@@ -255,6 +255,8 @@ enabled = false
 position = "bottom-center"
 time_format = ""
 date_format = "{:%F}"
+time_font_size = 64
+date_font_size = 18.5
 )toml";
 
       const ScopedStateDirectory stateDirectory(fixture.runtimeDirectory);
@@ -263,6 +265,8 @@ date_format = "{:%F}"
       expect("clock position parses", preferences.clockPosition == "bottom-center", true, {}, passed);
       expect("empty clock format is preserved", preferences.clockTimeFormat.empty(), true, {}, passed);
       expect("clock date format parses", preferences.clockDateFormat == "{:%F}", true, {}, passed);
+      expect("integer clock time font size parses", preferences.clockTimeFontSize == 64.0f, true, {}, passed);
+      expect("decimal clock date font size parses", preferences.clockDateFontSize == 18.5f, true, {}, passed);
 
       const auto configPath = fixture.runtimeDirectory / "greeter.toml";
       const auto config = greeter::config::loadConfig(configPath);
@@ -271,6 +275,53 @@ date_format = "{:%F}"
       expect(
           "empty clock format survives rewrite",
           rewritten.clockTimeFormat.has_value() && rewritten.clockTimeFormat->empty(), true, {}, passed
+      );
+      expect("clock time font size survives rewrite", rewritten.clockTimeFontSize == 64.0f, true, {}, passed);
+      expect("clock date font size survives rewrite", rewritten.clockDateFontSize == 18.5f, true, {}, passed);
+    }
+
+    for (const std::string_view value : {"", "0", "-12", "\"large\"", "true", "inf", "nan", "1e100"}) {
+      Fixture fixture(0700, 0600);
+      const auto configPath = fixture.runtimeDirectory / "greeter.toml";
+      std::ofstream file(configPath);
+      file << "[clock]\n";
+      if (!value.empty()) {
+        file << "time_font_size = " << value << "\ndate_font_size = " << value << '\n';
+      }
+      file.close();
+
+      const ScopedStateDirectory stateDirectory(fixture.runtimeDirectory);
+      const auto preferences = greeter::loadGreeterPreferences();
+      expect(
+          "omitted or invalid clock time font size uses default", preferences.clockTimeFontSize == 48.0f, true,
+          std::string(value), passed
+      );
+      expect(
+          "omitted or invalid clock date font size uses default", preferences.clockDateFontSize == 14.0f, true,
+          std::string(value), passed
+      );
+    }
+
+    for (const bool timeOnly : {true, false}) {
+      Fixture fixture(0700, 0600);
+      const auto configPath = fixture.runtimeDirectory / "greeter.toml";
+      greeter::config::GreeterConfigFile config;
+      if (timeOnly) {
+        config.clockTimeFontSize = 60.0f;
+      } else {
+        config.clockDateFontSize = 20.0f;
+      }
+      expect("font-size-only clock config writes", greeter::config::writeConfig(configPath, config), true, {}, passed);
+
+      const ScopedStateDirectory stateDirectory(fixture.runtimeDirectory);
+      const auto preferences = greeter::loadGreeterPreferences();
+      expect(
+          "clock time font size is independent", preferences.clockTimeFontSize == (timeOnly ? 60.0f : 48.0f), true, {},
+          passed
+      );
+      expect(
+          "clock date font size is independent", preferences.clockDateFontSize == (timeOnly ? 14.0f : 20.0f), true, {},
+          passed
       );
     }
 

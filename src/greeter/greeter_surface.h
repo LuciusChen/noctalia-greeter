@@ -289,6 +289,8 @@ private:
   std::string m_clockPosition = "above-panel";
   std::string m_clockTimeFormat = "{:%H:%M}";
   std::string m_clockDateFormat = "%A, %x";
+  float m_clockTimeFontSize = 48.0f;
+  float m_clockDateFontSize = 14.0f;
   std::optional<std::int64_t> m_lastClockSecond;
   std::chrono::steady_clock::time_point m_lastAnimTick{};
   bool m_animTickInitialized = false;

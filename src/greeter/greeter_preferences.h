@@ -40,6 +40,9 @@ namespace greeter {
     std::string clockPosition = "above-panel";
     std::string clockTimeFormat = "{:%H:%M}";
     std::string clockDateFormat = "%A, %x";
+    // Font sizes in logical pixels before UI scaling.
+    float clockTimeFontSize = 48.0f;
+    float clockDateFontSize = 14.0f;
   };
 
   [[nodiscard]] std::filesystem::path greeterConfPath();

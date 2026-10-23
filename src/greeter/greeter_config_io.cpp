@@ -91,7 +91,12 @@ namespace {
   [[nodiscard]] bool isKnownIdleKey(std::string_view key) { return key == "timeout"; }
 
   [[nodiscard]] bool isKnownClockKey(std::string_view key) {
-    return key == "enabled" || key == "position" || key == "time_format" || key == "date_format";
+    return key == "enabled"
+        || key == "position"
+        || key == "time_format"
+        || key == "date_format"
+        || key == "time_font_size"
+        || key == "date_font_size";
   }
 
   [[nodiscard]] bool isKnownCursorKey(std::string_view key) { return key == "theme" || key == "size" || key == "path"; }
@@ -306,6 +311,18 @@ namespace {
               config.clockDateFormat = *value;
             } else {
               kLog.warn("{}: invalid clock.date_format value", path.string());
+            }
+          } else if (entryView == "time_font_size") {
+            if (const auto value = positiveFloatValue(entryNode)) {
+              config.clockTimeFontSize = *value;
+            } else {
+              kLog.warn("{}: invalid clock.time_font_size value", path.string());
+            }
+          } else if (entryView == "date_font_size") {
+            if (const auto value = positiveFloatValue(entryNode)) {
+              config.clockDateFontSize = *value;
+            } else {
+              kLog.warn("{}: invalid clock.date_font_size value", path.string());
             }
           }
         } else if (keyView == "output") {
@@ -554,7 +571,9 @@ namespace {
     if (config.clockEnabled.has_value()
         || config.clockPosition.has_value()
         || config.clockTimeFormat.has_value()
-        || config.clockDateFormat.has_value()) {
+        || config.clockDateFormat.has_value()
+        || config.clockTimeFontSize.has_value()
+        || config.clockDateFontSize.has_value()) {
       toml::table clock;
       if (config.clockEnabled.has_value()) {
         clock.insert_or_assign("enabled", *config.clockEnabled);
@@ -570,6 +589,12 @@ namespace {
       }
       if (config.clockDateFormat.has_value()) {
         clock.insert_or_assign("date_format", *config.clockDateFormat);
+      }
+      if (config.clockTimeFontSize.has_value()) {
+        clock.insert_or_assign("time_font_size", *config.clockTimeFontSize);
+      }
+      if (config.clockDateFontSize.has_value()) {
+        clock.insert_or_assign("date_font_size", *config.clockDateFontSize);
       }
       root.insert("clock", std::move(clock));
     }
@@ -1009,7 +1034,7 @@ namespace greeter::config {
            "[idle] timeout, [cursor] theme/size/path\n";
     out << "# [keyboard] layout/variant/options/numlock\n";
     out << "# [auth] allow_empty_password (bool), request_timeout (0-3600 seconds; default 60, 0 disables)\n";
-    out << "# [clock] enabled/position/time_format/date_format\n";
+    out << "# [clock] enabled/position/time_format/date_format/time_font_size/date_font_size\n";
     out << '\n';
     out << formatToml(table);
 

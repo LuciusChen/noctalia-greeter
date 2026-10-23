@@ -235,7 +235,7 @@ void GreeterSurface::initialize(RenderContext* context) {
   m_root.addChild(std::move(bottomLogo));
 
   auto clockTime = std::make_unique<Label>();
-  clockTime->setFontSize(Style::scaled(48.0f));
+  clockTime->setFontSize(Style::scaled(m_clockTimeFontSize));
   clockTime->setTextAlign(TextAlign::Center);
   clockTime->setColor(colorForRole(ColorRole::OnSurface));
   clockTime->setVisible(false);
@@ -244,7 +244,7 @@ void GreeterSurface::initialize(RenderContext* context) {
   m_root.addChild(std::move(clockTime));
 
   auto clockDate = std::make_unique<Label>();
-  clockDate->setFontSize(Style::fontSizeBody());
+  clockDate->setFontSize(Style::scaled(m_clockDateFontSize));
   clockDate->setTextAlign(TextAlign::Center);
   clockDate->setColor(colorForRole(ColorRole::OnSurfaceVariant));
   clockDate->setVisible(false);
@@ -1047,8 +1047,8 @@ void GreeterSurface::syncScaledTypography() {
   m_sessionSelectGlyph->setGlyphSize(Style::fontSizeBody());
   m_schemeSelectLabel->setFontSize(Style::fontSizeBody());
   m_schemeSelectGlyph->setGlyphSize(Style::fontSizeBody());
-  m_clockTimeLabel->setFontSize(Style::scaled(48.0f));
-  m_clockDateLabel->setFontSize(Style::fontSizeBody());
+  m_clockTimeLabel->setFontSize(Style::scaled(m_clockTimeFontSize));
+  m_clockDateLabel->setFontSize(Style::scaled(m_clockDateFontSize));
   m_loginButton->setGlyphSize(Style::fontSizeTitle());
   m_backButton->setGlyphSize(Style::fontSizeTitle());
   m_statusLabel->setFontSize(Style::fontSizeCaption());
@@ -2127,6 +2127,8 @@ void GreeterSurface::loadPreferences() {
   m_clockPosition = prefs.clockPosition;
   m_clockTimeFormat = prefs.clockTimeFormat;
   m_clockDateFormat = prefs.clockDateFormat;
+  m_clockTimeFontSize = prefs.clockTimeFontSize;
+  m_clockDateFontSize = prefs.clockDateFontSize;
 }
 
 void GreeterSurface::savePreferences() const {

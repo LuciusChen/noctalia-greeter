@@ -451,6 +451,12 @@ namespace greeter {
     if (file.clockDateFormat.has_value()) {
       prefs.clockDateFormat = *file.clockDateFormat;
     }
+    if (file.clockTimeFontSize.has_value()) {
+      prefs.clockTimeFontSize = *file.clockTimeFontSize;
+    }
+    if (file.clockDateFontSize.has_value()) {
+      prefs.clockDateFontSize = *file.clockDateFontSize;
+    }
     if (file.authAllowEmptyPassword.has_value()) {
       prefs.allowEmptyPassword = *file.authAllowEmptyPassword;
     }

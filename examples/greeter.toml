@@ -82,6 +82,9 @@ position = "above-panel"
 # Noctalia-compatible bare strftime or C++ chrono formats. Empty hides that line.
 time_format = "{:%H:%M}"
 date_format = "%A, %x"
+# Font sizes in logical pixels before UI scaling; positive integers or decimals.
+time_font_size = 48
+date_font_size = 14
 
 [output]
 # Use layout, transforms, and scales from sync.toml when not declared here (default true).
