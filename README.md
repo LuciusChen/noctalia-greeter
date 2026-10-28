@@ -71,3 +71,11 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 Bundled Wuffs code is available under Apache-2.0 or MIT. See
 [packaging notes](PACKAGING.md#vendored-no-system-package) for its license notices.
+
+## Star History
+
+<p align="center">
+  <a href="https://github.com/noctalia-dev/noctalia/stargazers">
+    <img src="https://api.noctalia.dev/stars-animated/greeter" alt="Star History" />
+  </a>
+</p>
