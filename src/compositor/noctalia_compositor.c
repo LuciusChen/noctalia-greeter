@@ -2463,6 +2463,9 @@ static void try_launch_greeter(void* data) {
   }
 
   warp_cursor_to_initial_position(server);
+  // Show the pointer only once it is centered, not at the layout origin while
+  // the outputs come up.
+  wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
 
   char** argv = child_argv(server->child_argc, server->child_argv_ptr);
   bool free_argv = server->child_argc <= 1 || (server->child_argc > 1 && strcmp(server->child_argv_ptr[1], "--") == 0);
@@ -2721,7 +2724,6 @@ int main(int argc, char** argv) {
 
   server.cursor_mgr = wlr_xcursor_manager_create(cursor_theme, cursor_size);
   wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
-  wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
 
   server.new_output.notify = handle_new_output;
   wl_signal_add(&server.backend->events.new_output, &server.new_output);
